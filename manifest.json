@@ -1,0 +1,22 @@
+{
+  "name": "AI-UK 提词器",
+  "short_name": "提词器",
+  "description": "AI-UK 智能语音跟随提词器",
+  "start_url": "./teleprompter.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0A0C",
+  "theme_color": "#0A0A0C",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
