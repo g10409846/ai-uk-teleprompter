@@ -14,16 +14,19 @@
 <style>
 :root {
   color-scheme: dark;
-  --bg: #0A0A0C;
-  --surface: #141419;
-  --text: #D8DCE0;
-  --text-dim: #6B6F76;
+  --bg: #08080A;
+  --surface: #111116;
+  --surface-hover: #1A1A22;
+  --text: #E4E6EA;
+  --text-dim: #5E626A;
   --accent: #E6A817;
   --accent-glow: rgba(230,168,23,0.25);
   --danger: #E04848;
-  --radius: 12px;
+  --radius: 14px;
+  --radius-sm: 10px;
   --font-display: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-mono: "SF Mono", "Cascadia Code", "Menlo", monospace;
+  --transition: 0.2s cubic-bezier(0.2,0,0,1);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -35,6 +38,7 @@ html, body {
   color: var(--text);
   font-family: var(--font-display);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
@@ -54,121 +58,168 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
   flex-shrink: 0;
   z-index: 10;
+  background: var(--bg);
 }
 
 .logo {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   color: var(--text);
+}
+
+.logo-accent {
+  color: var(--accent);
+  font-weight: 800;
 }
 
 .rec-dot {
   display: none;
-  width: 8px; height: 8px;
+  width: 10px; height: 10px;
   border-radius: 50%;
   background: var(--danger);
-  box-shadow: 0 0 8px var(--danger);
+  box-shadow: 0 0 12px var(--danger);
   animation: pulse 1.5s ease-in-out infinite;
 }
 .rec-dot.active { display: block; }
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.85); }
 }
 
 /* ── Phase views ── */
-.phase { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.phase {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  animation: fadeIn 0.25s ease;
+}
 .phase.active { display: flex; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 /* ── Phase: edit ── */
 .edit-area {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 16px;
-  gap: 12px;
+  padding: 20px 20px 12px;
+  gap: 14px;
 }
 
 .edit-area textarea {
   flex: 1;
   background: var(--surface);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.06);
   border-radius: var(--radius);
   color: var(--text);
   font-family: var(--font-display);
   font-size: 17px;
-  line-height: 1.7;
-  padding: 16px;
+  line-height: 1.75;
+  padding: 18px;
   resize: none;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 .edit-area textarea:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
+.edit-area textarea::placeholder { color: rgba(255,255,255,0.12); }
 
 .edit-meta {
   display: flex;
   justify-content: space-between;
   font-size: 13px;
   color: var(--text-dim);
+  padding: 0 2px;
 }
 
-.edit-controls {
+.edit-settings {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 18px;
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.edit-controls label {
-  font-size: 12px;
-  color: var(--text-dim);
+.settings-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  min-height: 44px;
-  padding: 4px 0;
+  gap: 12px;
 }
 
-.edit-controls input[type="range"] {
-  width: 80px;
-  height: 44px;
+.settings-row > span:first-child {
+  font-size: 13px;
+  color: var(--text-dim);
+  min-width: 40px;
+  flex-shrink: 0;
+}
+
+.settings-row input[type="range"] {
+  flex: 1;
+  height: 36px;
   accent-color: var(--accent);
+}
+
+.settings-row .range-val {
+  font-size: 12px;
+  color: var(--text-dim);
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .mode-select {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
   flex-wrap: wrap;
-  margin-top: 4px;
+  padding-top: 2px;
+}
+
+.mode-select > span:first-child {
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 .mode-option {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   cursor: pointer;
   min-height: 44px;
-  padding: 4px 0;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid transparent;
+  transition: background var(--transition), border-color var(--transition);
+}
+.mode-option:has(input:checked) {
+  background: rgba(230,168,23,0.1);
+  border-color: var(--accent);
 }
 
 .mode-option input[type="radio"] {
   accent-color: var(--accent);
+  width: 16px; height: 16px;
 }
 
 /* ── Prompt-only: no camera ── */
 .prompt-only-container {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   background: var(--bg);
 }
 
@@ -178,15 +229,16 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 14px 28px;
+  padding: 15px 32px;
   border: none;
   border-radius: var(--radius);
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition);
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 .btn:active { transform: scale(0.97); }
 
@@ -195,24 +247,25 @@ html, body {
   color: #0A0A0C;
   width: 100%;
 }
+.btn-primary:hover { background: #F0B420; }
 
 .btn-ghost {
   background: transparent;
   color: var(--text);
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.1);
 }
-.btn-ghost:hover { border-color: rgba(255,255,255,0.25); }
+.btn-ghost:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
 
 .btn-sm {
-  padding: 8px 14px;
+  padding: 9px 16px;
   font-size: 13px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .btn-row {
   display: flex;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 12px 20px 20px;
   flex-shrink: 0;
 }
 
@@ -227,16 +280,21 @@ html, body {
 }
 
 .countdown-num {
-  font-size: 120px;
+  font-size: 128px;
   font-weight: 200;
   color: var(--accent);
   line-height: 1;
+  animation: countPop 0.4s ease;
+}
+@keyframes countPop {
+  from { transform: scale(1.3); opacity: 0.3; }
+  to   { transform: scale(1); opacity: 1; }
 }
 
 .countdown-hint {
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-dim);
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 /* ── Phase: recording ── */
@@ -258,7 +316,7 @@ html, body {
 
 .teleprompt-overlay {
   position: absolute;
-  inset: 16% 5% 16% 5%;
+  inset: 18% 8% 18% 8%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -270,11 +328,14 @@ html, body {
   font-family: var(--font-display);
   font-size: var(--prompt-size, 48px);
   font-weight: 500;
-  line-height: 1.6;
+  line-height: 1.65;
   text-align: center;
   color: rgba(255,255,255, var(--prompt-opacity, 0.92));
-  text-shadow: 0 0 12px rgba(0,0,0,0.7), 0 2px 4px rgba(0,0,0,0.5);
-  transition: transform 0.05s linear;
+  text-shadow:
+    0 0 16px rgba(0,0,0,0.8),
+    0 0 4px rgba(0,0,0,0.6),
+    0 2px 8px rgba(0,0,0,0.5);
+  transition: transform 0.06s linear;
   will-change: transform;
   white-space: pre-wrap;
   width: 100%;
@@ -282,51 +343,55 @@ html, body {
 
 .sight-line {
   position: absolute;
-  left: 8%;
-  right: 8%;
+  left: 10%;
+  right: 10%;
   top: 42%;
   height: 1px;
   background: var(--accent);
-  box-shadow: 0 0 20px var(--accent-glow);
-  opacity: 0.6;
+  box-shadow: 0 0 24px var(--accent-glow);
+  opacity: 0.5;
   z-index: 6;
   pointer-events: none;
 }
 
 .record-controls {
   position: absolute;
-  bottom: 24px;
+  bottom: 28px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  gap: 6px;
   z-index: 10;
-  background: rgba(10,10,12,0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 20px;
-  padding: 6px;
+  background: rgba(8,8,10,0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 22px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
 .record-controls .btn-sm {
-  border-radius: 16px;
+  border-radius: 18px;
   font-size: 13px;
   padding: 10px 16px;
+  border-color: transparent;
 }
 
 .status-badge {
   position: absolute;
-  top: 12px;
+  top: 16px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
-  font-size: 12px;
-  padding: 4px 12px;
+  font-size: 13px;
+  padding: 6px 16px;
   border-radius: 20px;
-  background: rgba(10,10,12,0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: var(--text-dim);
+  background: rgba(8,8,10,0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: background var(--transition);
 }
 
 /* ── Phase: completed ── */
@@ -337,7 +402,12 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  padding: 24px;
+  padding: 32px 24px;
+}
+
+.complete-area > p:first-of-type {
+  font-size: 15px;
+  color: var(--text-dim);
 }
 
 .complete-area video {
@@ -348,30 +418,21 @@ html, body {
 }
 
 .complete-check {
-  font-size: 48px;
+  font-size: 56px;
   color: var(--accent);
+  animation: fadeIn 0.5s ease;
 }
-
-/* ── Settings panel ── */
-.overlay-settings {
-  display: flex;
-  gap: 12px;
-  padding: 8px 16px;
-  font-size: 11px;
-  color: var(--text-dim);
-  flex-shrink: 0;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  flex-wrap: wrap;
-  align-items: center;
-}
-.overlay-settings label { display: flex; align-items: center; gap: 4px; }
-.overlay-settings input[type="range"] { width: 60px; accent-color: var(--accent); }
 
 /* ── Responsive ── */
 @media (max-width: 480px) {
+  .header { padding: 12px 16px; }
+  .logo { font-size: 15px; }
+  .edit-area { padding: 16px 16px 10px; }
   .prompt-text { font-size: calc(var(--prompt-size, 48px) * 0.7); }
-  .record-controls { gap: 4px; padding: 4px; }
-  .record-controls .btn-sm { padding: 8px 12px; font-size: 12px; }
+  .record-controls { gap: 4px; padding: 4px; bottom: 20px; }
+  .record-controls .btn-sm { padding: 9px 12px; font-size: 12px; border-radius: 16px; }
+  .countdown-num { font-size: 100px; }
+  .sight-line { left: 8%; right: 8%; }
 }
 </style>
 </head>
@@ -381,7 +442,7 @@ html, body {
 
   <!-- Header -->
   <div class="header">
-    <span class="logo">AI-UK 提词器</span>
+    <span class="logo">AI-UK <span class="logo-accent">提词器</span></span>
     <div>
       <span class="rec-dot" id="recDot"></span>
     </div>
@@ -395,15 +456,27 @@ html, body {
         <span id="charCount">0 字</span>
         <span id="estDuration">预计 0 秒</span>
       </div>
-      <div class="edit-controls">
-        <label>字号 <input type="range" id="fontSizeSlider" min="24" max="96" value="48" step="2"></label>
-        <label>透明度 <input type="range" id="opacitySlider" min="30" max="100" value="92" step="1"></label>
-        <label>速度 <input type="range" id="baseSpeedSlider" min="1.5" max="8" value="3.5" step="0.1"></label>
-      </div>
-      <div class="mode-select">
-        <span style="font-size:13px;color:var(--text-dim);margin-right:8px;">模式</span>
-        <label class="mode-option" id="modeFull"><input type="radio" name="mode" value="full" checked> 提词+录制</label>
-        <label class="mode-option" id="modePrompt"><input type="radio" name="mode" value="prompt"> 纯提词</label>
+      <div class="edit-settings">
+        <div class="settings-row">
+          <span>字号</span>
+          <input type="range" id="fontSizeSlider" min="24" max="96" value="48" step="2">
+          <span class="range-val" id="fontSizeVal">48</span>
+        </div>
+        <div class="settings-row">
+          <span>透明度</span>
+          <input type="range" id="opacitySlider" min="30" max="100" value="92" step="1">
+          <span class="range-val" id="opacityVal">92%</span>
+        </div>
+        <div class="settings-row">
+          <span>速度</span>
+          <input type="range" id="baseSpeedSlider" min="1.5" max="8" value="3.5" step="0.1">
+          <span class="range-val" id="baseSpeedVal">3.5 字/秒</span>
+        </div>
+        <div class="mode-select">
+          <span>模式</span>
+          <label class="mode-option" id="modeFull"><input type="radio" name="mode" value="full" checked> 提词+录制</label>
+          <label class="mode-option" id="modePrompt"><input type="radio" name="mode" value="prompt"> 纯提词</label>
+        </div>
       </div>
     </div>
     <div class="btn-row">
@@ -539,6 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.fontSize = parseInt(e.target.value);
     promptText.style.setProperty('--prompt-size', `${state.fontSize}px`);
     localStorage.setItem('tp-fontSize', state.fontSize);
+	    $('#fontSizeVal').textContent = state.fontSize;
   });
 
   // ── Opacity ──
@@ -546,6 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.opacity = parseInt(e.target.value) / 100;
     promptText.style.setProperty('--prompt-opacity', state.opacity);
     localStorage.setItem('tp-opacity', Math.round(state.opacity * 100));
+	    $('#opacityVal').textContent = e.target.value + '%';
   });
 
   // ── Base speed ──
@@ -553,6 +628,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.baseScrollSpeed = parseFloat(e.target.value);
     state.scrollSpeed = state.baseScrollSpeed + state.manualSpeedAdjust;
     localStorage.setItem('tp-baseSpeed', state.baseScrollSpeed);
+	    $('#baseSpeedVal').textContent = e.target.value + ' 字/秒';
   });
 
   // ── Mode select ──
@@ -580,6 +656,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (bs) { state.baseScrollSpeed = parseFloat(bs); state.scrollSpeed = state.baseScrollSpeed; $('#baseSpeedSlider').value = bs; }
     promptText.style.setProperty('--prompt-size', `${state.fontSize}px`);
     promptText.style.setProperty('--prompt-opacity', state.opacity);
+    $('#fontSizeVal').textContent = state.fontSize;
+    $('#opacityVal').textContent = Math.round(state.opacity * 100) + '%';
+    $('#baseSpeedVal').textContent = state.baseScrollSpeed + ' 字/秒';
   })();
 
 }); // end DOMContentLoaded

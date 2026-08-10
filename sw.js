@@ -1,7 +1,7 @@
 // AI-UK 提词器 · Service Worker
 // 缓存核心文件，支持离线启动
 
-const CACHE = 'ai-uk-teleprompter-v2';
+const CACHE = 'ai-uk-teleprompter-v3';
 
 const PRECACHE = [
   './teleprompter.html',
