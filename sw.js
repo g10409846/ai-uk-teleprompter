@@ -1,9 +1,10 @@
 // AI-UK 提词器 · Service Worker
 // HTML 优先网络请求（保证更新即时生效），其他资源缓存优先（离线可用）
 
-const CACHE = 'ai-uk-teleprompter-v4';
+const CACHE = 'ai-uk-teleprompter-v5';
 
 const PRECACHE = [
+  './teleprompter.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
@@ -33,10 +34,29 @@ self.addEventListener('fetch', (event) => {
   const isStatic = ['manifest.json', '.png'].some(ext => url.pathname.endsWith(ext));
 
   if (isHTML) {
-    // HTML: network-first → fallback to cache
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
-    );
+    // HTML: always try the network first, then save the fresh copy as an
+    // offline fallback. This avoids stale-first updates without breaking PWA
+    // launch after the device goes offline.
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(event.request, { cache: 'no-store' });
+        if (response && response.ok) {
+          try {
+            const cache = await caches.open(CACHE);
+            await cache.put(event.request, response.clone());
+          } catch (cacheError) {
+            console.warn('HTML offline cache skipped:', cacheError);
+          }
+        }
+        return response;
+      } catch (networkError) {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        // The root path is not the canonical launch URL, but map it to the
+        // precached document when possible.
+        return caches.match('./teleprompter.html');
+      }
+    })());
   } else if (isStatic) {
     // Static assets: cache-first → network fallback
     event.respondWith(
