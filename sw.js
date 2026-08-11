@@ -1,7 +1,7 @@
 // AI-UK 提词器 · Service Worker
 // HTML 优先网络请求（保证更新即时生效），其他资源缓存优先（离线可用）
 
-const CACHE = 'ai-uk-teleprompter-v5';
+const CACHE = 'ai-uk-teleprompter-v6';
 
 const PRECACHE = [
   './teleprompter.html',
