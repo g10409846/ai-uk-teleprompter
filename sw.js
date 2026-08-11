@@ -1,10 +1,9 @@
 // AI-UK 提词器 · Service Worker
-// 缓存核心文件，支持离线启动
+// HTML 优先网络请求（保证更新即时生效），其他资源缓存优先（离线可用）
 
-const CACHE = 'ai-uk-teleprompter-v3';
+const CACHE = 'ai-uk-teleprompter-v4';
 
 const PRECACHE = [
-  './teleprompter.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
@@ -28,16 +27,32 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetched = fetch(event.request).then((response) => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      });
-      return cached || fetched;
-    })
-  );
+
+  const url = new URL(event.request.url);
+  const isHTML = url.pathname.endsWith('teleprompter.html') || url.pathname.endsWith('/');
+  const isStatic = ['manifest.json', '.png'].some(ext => url.pathname.endsWith(ext));
+
+  if (isHTML) {
+    // HTML: network-first → fallback to cache
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+  } else if (isStatic) {
+    // Static assets: cache-first → network fallback
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        const fetched = fetch(event.request).then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        });
+        return cached || fetched;
+      })
+    );
+  } else {
+    // Everything else: network first
+    event.respondWith(fetch(event.request));
+  }
 });
