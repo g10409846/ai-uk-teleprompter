@@ -503,7 +503,7 @@ html, body {
       </div>
       <div class="status-badge" id="statusBadge">等待声音…</div>
       <div class="record-controls">
-        <button class="btn-sm btn-ghost" id="btnAutoMode">跟随中</button>
+        <button class="btn-sm btn-ghost" id="btnAutoMode">智能跟随</button>
         <button class="btn-sm btn-ghost" id="btnSlower">− 放慢</button>
         <button class="btn-sm btn-ghost" id="btnFaster">+ 加快</button>
         <button class="btn-sm btn-ghost" id="btnPause">暂停</button>
@@ -957,8 +957,8 @@ function scrollLoop(timestamp) {
   const cappedDt = Math.min(dt, 0.1);
 
   const shouldScroll = !state.paused && (
-    (state.autoMode && state.isSpeaking) ||  // auto: only when speaking
-    !state.autoMode                           // manual: always
+    (state.autoMode && state.isSpeaking) ||  // smart follow: scroll when speaking
+    !state.autoMode                           // manual: scroll always
   );
 
   if (shouldScroll) {
@@ -1057,22 +1057,30 @@ function startMediaRecorder(stream) {
 }
 
 // ═══════════════════════════════════════════
+// Continuous smooth scroll — text flows upward like a ticker
+// ═══════════════════════════════════════════
 function updatePromptDisplay() {
   const text = state.script || '';
   const totalChars = text.length;
   if (totalChars === 0) { promptText.textContent = ''; return; }
 
-  const windowChars = Math.floor(100 / (state.fontSize / 48));
-  const start = Math.max(0, Math.floor(state.visibleStart - windowChars * 0.3));
-  const end = Math.min(totalChars, start + windowChars);
+  // Build display text: show a continuous band around the current position
+  // Show ~80 lines above current position and ~40 lines below
+  const charsPerLine = Math.floor(2000 / (state.fontSize || 48));
+  const showAbove = 80;
+  const showBelow = 40;
+  const start = Math.max(0, Math.floor(state.visibleStart - charsPerLine * showAbove));
+  const end = Math.min(totalChars, start + charsPerLine * (showAbove + showBelow));
   const visible = text.substring(start, end);
-
   promptText.textContent = visible;
 
-  const posInWindow = state.visibleStart - start;
-  const ratioInWindow = windowChars > 0 ? posInWindow / windowChars : 0;
-  const offsetPercent = (ratioInWindow - 0.35) * 100;
-  promptText.style.transform = `translateY(-${offsetPercent}%)`;
+  // Calculate offset: position text so current position is near reference line (35% from top)
+  const charsOffset = state.visibleStart - start;
+  const lineOffset = Math.floor(charsOffset / charsPerLine);
+  const pixelsPerLine = (state.fontSize || 48) * 1.65;
+  const targetY = -(lineOffset * pixelsPerLine + charsOffset % charsPerLine / charsPerLine * pixelsPerLine);
+  const clampedY = Math.min(0, Math.max(targetY, -(totalChars / charsPerLine) * pixelsPerLine));
+  promptText.style.transform = `translateY(${clampedY}px)`;
 }
 
 // ═══════════════════════════════════════════
@@ -1135,7 +1143,7 @@ async function startCountdown() {
   state.consecutiveSilence = 0;
   state.lastRafTime = 0;
   recDot.classList.add('active');
-  $('#btnAutoMode').textContent = '跟随中';
+  $('#btnAutoMode').textContent = '智能跟随';
 
   // Build prompt display
   updatePromptDisplay();
@@ -1256,8 +1264,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('#btnAutoMode').addEventListener('click', () => {
     state.autoMode = !state.autoMode;
-    $('#btnAutoMode').textContent = state.autoMode ? '跟随中' : '手动';
-    statusBadge.textContent = state.autoMode ? '跟随中' : '手动模式';
+    if (state.autoMode) {
+      $('#btnAutoMode').textContent = '智能跟随';
+      statusBadge.textContent = '智能跟随中';
+    } else {
+      $('#btnAutoMode').textContent = '手动';
+      statusBadge.textContent = '手动模式';
+    }
   });
 
   $('#btnSlower').addEventListener('click', () => {
