@@ -11,6 +11,10 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>AI-UK 提词器</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
 <style>
 :root {
   color-scheme: dark;
@@ -1354,7 +1358,7 @@ console.log('快捷键: 空格=暂停/继续, ←→=微调速, M=切换手动/�
 
 // Register Service Worker for offline support
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').then((reg) => {
+  navigator.serviceWorker.register('sw.js?v=202608111931').then((reg) => {
     console.log('SW registered:', reg.scope);
   }).catch((e) => {
     console.log('SW registration skipped:', e.message);
