@@ -599,9 +599,14 @@ document.addEventListener('DOMContentLoaded', () => {
   btnDownload = $('#btnDownload');
   countdownNum = $('#countdownNum');
 
-  // ── Edit: meta updates ──
+  // ── Edit: strip blank lines & meta ──
   scriptInput.addEventListener('input', () => {
-    const text = scriptInput.value;
+    let text = scriptInput.value;
+    // Remove blank lines (lines that are empty or only whitespace)
+    text = text.split('\n').filter(l => l.trim() !== '').join('\n');
+    if (text !== scriptInput.value) {
+      scriptInput.value = text;
+    }
     charCount.textContent = `${text.length} 字`;
     const estimatedSec = text.length / 4.5;
     estDuration.textContent = `预计 ${Math.round(estimatedSec)} 秒`;
@@ -668,16 +673,33 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════
 
 function normalizeText(t) {
+  // Strip punctuation but preserve newlines as line separators
   return t.replace(/[，,。！？、；：""''「」『』【】（）\(\)\s]+/g, '').trim();
 }
 
+function splitByLine(script) {
+  // Split on newlines and strip blank lines, preserving original positions
+  const lines = [];
+  let pos = 0;
+  for (const raw of script.split('\n')) {
+    const line = raw.trim();
+    if (!line) { pos += raw.length + 1; continue; }
+    lines.push({ text: line, norm: normalizeText(line), startPos: pos, endPos: pos + line.length });
+    pos += raw.length + 1;
+  }
+  return lines;
+}
+
 function splitSentences(script) {
+  // Also build line-level index for anchoring
+  scriptLines = splitByLine(script);
+  
   const raw = script.split(/(?<=[。！？\n])/g);
   const sentences = [];
   let pos = 0;
   for (const r of raw) {
     const text = r.trim();
-    if (!text) { pos += r.length + 1; continue; } // skip empty
+    if (!text) { pos += r.length + 1; continue; }
     const norm = normalizeText(text);
     sentences.push({ text, norm, startPos: pos, endPos: pos + text.length, charLen: text.length });
     pos += r.length;
@@ -686,44 +708,71 @@ function splitSentences(script) {
 }
 
 let scriptSentences = [];
+let scriptLines = [];
 
 function anchorToRecognition(transcript) {
   const normTrans = normalizeText(transcript);
-  if (normTrans.length < 4) return; // too short to anchor
+  if (normTrans.length < 4) return;
 
-  // Find the best matching sentence
-  let best = null;
-  let bestScore = 0;
-
-  for (const s of scriptSentences) {
-    if (s.norm.length < 4) continue;
-    // Use longest common substring ratio as match score
-    const lcsLen = longestCommonSubstring(normTrans, s.norm);
-    const score = lcsLen / Math.max(s.norm.length, 1);
-    if (score > bestScore && score > 0.35) {
-      bestScore = score;
-      best = s;
+  // ── Strategy A: try line-level matching first (more granular) ──
+  let bestLine = null;
+  let bestLineScore = 0;
+  for (const line of scriptLines) {
+    if (line.norm.length < 4) continue;
+    const lcs = longestCommonSubstring(normTrans, line.norm);
+    // Use ratio of LCS to the shorter string for fairness
+    const score = lcs / Math.max(line.norm.length, normTrans.length);
+    if (score > bestLineScore) {
+      bestLineScore = score;
+      bestLine = line;
     }
   }
 
-  if (!best || bestScore < 0.4) return;
+  // ── Strategy B: try sentence-level matching ──
+  let bestSent = null;
+  let bestSentScore = 0;
+  for (const s of scriptSentences) {
+    if (s.norm.length < 4) continue;
+    const lcs = longestCommonSubstring(normTrans, s.norm);
+    const score = lcs / Math.max(s.norm.length, 1);
+    if (score > bestSentScore) {
+      bestSentScore = score;
+      bestSent = s;
+    }
+  }
 
-  // Anchor: set visibleStart to this sentence's start
-  // Only anchor back if user re-reads (current position > sentence end)
-  // Or anchor forward if current position is far behind (lagging)
+  // ── Select best result ──
+  // Prefer sentence match if high confidence (full sentence captured)
+  // Prefer line match for partial utterances
+  let best = null;
+  let bestScore = 0;
+  if (bestSentScore > 0.5 && bestSentScore > bestLineScore) {
+    best = bestSent;
+    bestScore = bestSentScore;
+  } else if (bestLineScore >= 0.25) {
+    best = bestLine;
+    bestScore = bestLineScore;
+  } else if (bestSentScore > 0.4) {
+    best = bestSent;
+    bestScore = bestSentScore;
+  }
+
+  if (!best) return;
+
   const currentPos = state.visibleStart;
   const targetPos = best.startPos;
+  const currentEnd = state.visibleStart + 60; // approximate visible window end
 
-  if (bestScore > 0.6) {
-    // High confidence: snap to sentence
+  if (bestScore >= 0.6) {
+    // High confidence: snap directly to matched text
     state.visibleStart = targetPos;
     statusBadge.textContent = `锚定: "${best.text.slice(0, 15)}..."`;
-  } else if (targetPos < currentPos && currentPos - targetPos > 10) {
-    // Medium confidence + user re-reading: snap back
-    state.visibleStart = targetPos;
-    statusBadge.textContent = '← 检测到重读';
-  } else if (targetPos > currentPos + 30) {
-    // User far ahead of scroll position: catch up
+  } else if (targetPos < currentEnd && targetPos >= currentPos - 20) {
+    // Near current position: adjust to show this line
+    state.visibleStart = Math.min(targetPos, currentPos);
+    statusBadge.textContent = '← 调整位置';
+  } else if (targetPos > currentPos + 20) {
+    // Ahead: catch up
     state.visibleStart = targetPos;
     statusBadge.textContent = '→ 跟随到位';
   }
