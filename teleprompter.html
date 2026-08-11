@@ -888,7 +888,7 @@ function startRecognition() {
         state.scrollSpeed = smoothedSpeed + state.manualSpeedAdjust;
         state.scrollSpeed = Math.min(Math.max(state.scrollSpeed, 1.0), 9.0);
 
-        statusBadge.textContent = `跟随中 · ${state.scrollSpeed.toFixed(1)}字/秒`;
+        statusBadge.textContent = `智能跟随 · ${state.scrollSpeed.toFixed(1)}字/秒`;
       }
 
       lastResultTime = now;
