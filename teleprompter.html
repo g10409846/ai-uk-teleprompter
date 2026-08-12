@@ -1115,7 +1115,11 @@ function updatePromptDisplay() {
   const lineOffset = Math.floor(charsOffset / charsPerLine);
   const charOffsetInLine = charsOffset % charsPerLine;
   const targetY = -(lineOffset * pixelsPerLine + charOffsetInLine / charsPerLine * pixelsPerLine);
-  const maxScroll = -(totalChars / charsPerLine) * pixelsPerLine;
+
+  // FIX: Use visible text length, not total script length, for max scroll
+  // This ensures the text can scroll to the top when at the beginning
+  const visibleChars = end - start;
+  const maxScroll = -(visibleChars / charsPerLine) * pixelsPerLine;
   const clampedY = Math.min(0, Math.max(targetY, maxScroll));
   promptText.style.transform = `translateY(${clampedY}px)`;
 }
