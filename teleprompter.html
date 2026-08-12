@@ -829,6 +829,11 @@ function initSpeechRecognition() {
   rec.continuous = true;
   rec.interimResults = true;
   rec.maxAlternatives = 1;
+  // Aggressive timeout: restart within 1s of silence for responsive feel
+  rec.timeout = 2000;
+  // Single best hypothesis to reduce noise from alternatives
+  rec.maxAlternatives = 1;
+  console.log('SpeechRecognition initialized: zh-CN, timeout=2000ms, continuous');
   return rec;
 }
 
@@ -843,7 +848,8 @@ function startRecognition() {
 
   let lastResultTime = Date.now();
   let lastRecognizedText = '';
-  let smoothedSpeed = 0;  // running average of chars/sec
+  let speedSamples = [];  // sliding window of recent speed samples
+  let smoothedSpeed = 0;  // EMA from sliding window median
 
   recognition.onresult = (event) => {
     const now = Date.now();
@@ -873,7 +879,7 @@ function startRecognition() {
     }
 
     if (state.autoMode && !state.paused) {
-      // ── Measure real speaking speed ──
+      // ── Measure real speaking speed with sliding window ──
       // Count new characters since last result
       let newChars = 0;
       if (lastRecognizedText && transcript.startsWith(lastRecognizedText)) {
@@ -881,18 +887,28 @@ function startRecognition() {
       } else {
         newChars = transcript.length;
       }
+      // Reject degenerate cases (too short or duplicate)
+      if (newChars < 2) return;
       lastRecognizedText = transcript;
 
       const elapsed = (now - lastResultTime) / 1000;
       if (elapsed > 0.15 && newChars > 0) {
         const instantSpeed = newChars / elapsed;
-        // Smooth: exponential moving average (30% new, 70% old)
+
+        // Sliding window: keep last 5 samples, use median for stability
+        speedSamples.push(instantSpeed);
+        if (speedSamples.length > 5) speedSamples.shift();
+        // Compute median
+        const sorted = [...speedSamples].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+
+        // Apply EMA to median: 60% old, 40% new
         if (smoothedSpeed === 0) {
-          smoothedSpeed = instantSpeed;
+          smoothedSpeed = median;
         } else {
-          smoothedSpeed = smoothedSpeed * 0.7 + instantSpeed * 0.3;
+          smoothedSpeed = smoothedSpeed * 0.6 + median * 0.4;
         }
-        // Clamp to realistic range: 1-8 chars/sec
+        // Clamp to realistic range: 1-8 chars/sec (normal Chinese speech)
         smoothedSpeed = Math.min(Math.max(smoothedSpeed, 1.0), 8.0);
 
         // Apply as scroll speed
@@ -990,15 +1006,20 @@ function startSilenceDetection() {
     if (state.phase !== 'record') return;
     if (!state.autoMode) return;
 
-    // If no recognition result for > 0.8s, treat as silence
+    // Adaptive silence detection:
+    // - Use 12 frames (~2.4s) for initial silence detection
+    // - Then use 8 frames (~1.6s) to catch up after resumed speaking
     state.consecutiveSilence++;
     const silenceFrames = state.consecutiveSilence;
 
-    if (silenceFrames > 4) { // ~0.8s at 200ms interval
+    if (silenceFrames > 12) { // ~2.4s silence = confirmed pause
       state.isSpeaking = false;
-      if (silenceFrames % 10 === 5) {
+      if (statusBadge.textContent !== '已停顿') {
         statusBadge.textContent = '已停顿';
       }
+    } else if (state.isSpeaking && silenceFrames > 8) {
+      // Transition zone: warn but don't fully stop yet
+      state.isSpeaking = false;
     }
   }, 200);
 }
