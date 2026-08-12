@@ -1116,10 +1116,8 @@ function updatePromptDisplay() {
   const charOffsetInLine = charsOffset % charsPerLine;
   const targetY = -(lineOffset * pixelsPerLine + charOffsetInLine / charsPerLine * pixelsPerLine);
 
-  // FIX: Use visible text length, not total script length, for max scroll
-  // This ensures the text can scroll to the top when at the beginning
-  const visibleChars = end - start;
-  const maxScroll = -(visibleChars / charsPerLine) * pixelsPerLine;
+  // Calculate max scroll based on total content, not just visible portion
+  const maxScroll = -(totalChars / charsPerLine) * pixelsPerLine;
   const clampedY = Math.min(0, Math.max(targetY, maxScroll));
   promptText.style.transform = `translateY(${clampedY}px)`;
 }
@@ -1176,6 +1174,8 @@ async function startCountdown() {
 
   state.visibleStart = 0;
   state.manualPositionAdjust = 0;
+  // Show first line at reference position by setting initial offset
+  // (allows scrolling up to see beginning of script)
   state.scrollSpeed = state.baseScrollSpeed;
   state.manualSpeedAdjust = 0;
   state.isSpeaking = false;
@@ -1203,6 +1203,47 @@ async function startCountdown() {
 
   // Start scroll loop
   scrollRAF = requestAnimationFrame(scrollLoop);
+  
+  // Add mouse wheel handler for manual scroll control
+  addMouseWheelHandler();
+}
+
+// ═══════════════════════════════════════════
+// Mouse wheel scroll handler
+// ═══════════════════════════════════════════
+function addMouseWheelHandler() {
+  const container = document.getElementById('recordContainer');
+  if (!container) return;
+  
+
+  
+  // Touch drag for mobile scroll
+  let touchStartY = 0;
+  container.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  container.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const touchEndY = e.touches[0].clientY;
+    const deltaY = touchStartY - touchEndY;
+    if (Math.abs(deltaY) > 10) { // Only scroll if moved more than 10px
+      const scrollAmount = Math.sign(deltaY) * Math.min(20, Math.abs(deltaY));
+      state.visibleStart = Math.max(0, Math.min(state.script.length, state.visibleStart + scrollAmount));
+      updatePromptDisplay();
+      statusBadge.textContent = deltaY > 0 ? '↑ 上滚' : '↓ 下滚';
+      setTimeout(() => updateFollowStatus(), 1000);
+    }
+  }, { passive: false });
+  container.addEventListener('wheel', (e) => {
+    if (state.phase !== 'record') return;
+    e.preventDefault();
+    
+    const scrollAmount = e.deltaY > 0 ? 5 : -5; // 5 chars per scroll event
+    state.visibleStart = Math.max(0, Math.min(state.script.length, state.visibleStart + scrollAmount));
+    updatePromptDisplay();
+    statusBadge.textContent = scrollAmount > 0 ? '↓ 下滚' : '↑ 上滚';
+    setTimeout(() => updateFollowStatus(), 1000);
+  }, { passive: false });
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
