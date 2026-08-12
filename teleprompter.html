@@ -507,6 +507,8 @@ html, body {
       </div>
       <div class="status-badge" id="statusBadge">等待声音…</div>
       <div class="record-controls">
+        <button class="btn-sm btn-ghost" id="btnUp">↑ 上滚</button>
+        <button class="btn-sm btn-ghost" id="btnDown">↓ 下滚</button>
         <button class="btn-sm btn-ghost" id="btnAutoMode">智能跟随</button>
         <button class="btn-sm btn-ghost" id="btnSlower">− 放慢</button>
         <button class="btn-sm btn-ghost" id="btnFaster">+ 加快</button>
@@ -562,6 +564,7 @@ const state = {
   stream: null,
   lastRafTime: 0,
   mode: 'full',              // 'full' = camera+record, 'prompt' = teleprompt only
+  manualPositionAdjust: 0,   // manual scroll position offset in chars
 };
 
 // ── DOM refs ──
@@ -1096,22 +1099,24 @@ function updatePromptDisplay() {
   const totalChars = text.length;
   if (totalChars === 0) { promptText.textContent = ''; return; }
 
-  // Build display text: show a continuous band around the current position
-  // Show ~80 lines above current position and ~40 lines below
   const charsPerLine = Math.floor(2000 / (state.fontSize || 48));
-  const showAbove = 80;
-  const showBelow = 40;
+  const pixelsPerLine = (state.fontSize || 48) * 1.65;
+
+  // Show enough text above and below the current position
+  const showAbove = 10;
+  const showBelow = 10;
   const start = Math.max(0, Math.floor(state.visibleStart - charsPerLine * showAbove));
   const end = Math.min(totalChars, start + charsPerLine * (showAbove + showBelow));
   const visible = text.substring(start, end);
   promptText.textContent = visible;
 
-  // Calculate offset: position text so current position is near reference line (35% from top)
+  // Position text so that visibleStart aligns with the reference line (42% from top)
   const charsOffset = state.visibleStart - start;
   const lineOffset = Math.floor(charsOffset / charsPerLine);
-  const pixelsPerLine = (state.fontSize || 48) * 1.65;
-  const targetY = -(lineOffset * pixelsPerLine + charsOffset % charsPerLine / charsPerLine * pixelsPerLine);
-  const clampedY = Math.min(0, Math.max(targetY, -(totalChars / charsPerLine) * pixelsPerLine));
+  const charOffsetInLine = charsOffset % charsPerLine;
+  const targetY = -(lineOffset * pixelsPerLine + charOffsetInLine / charsPerLine * pixelsPerLine);
+  const maxScroll = -(totalChars / charsPerLine) * pixelsPerLine;
+  const clampedY = Math.min(0, Math.max(targetY, maxScroll));
   promptText.style.transform = `translateY(${clampedY}px)`;
 }
 
@@ -1165,8 +1170,8 @@ async function startCountdown() {
     $('#recordContainer').style.background = 'var(--bg)';
   }
 
-  promptText.textContent = state.script;
   state.visibleStart = 0;
+  state.manualPositionAdjust = 0;
   state.scrollSpeed = state.baseScrollSpeed;
   state.manualSpeedAdjust = 0;
   state.isSpeaking = false;
@@ -1307,6 +1312,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  $('#btnUp').addEventListener('click', () => {
+    state.manualPositionAdjust += 3;
+    state.visibleStart = Math.max(0, state.visibleStart - 3);
+    updatePromptDisplay();
+    statusBadge.textContent = '↑ 上滚';
+    setTimeout(() => updateFollowStatus(), 1000);
+  });
+
+  $('#btnDown').addEventListener('click', () => {
+    state.manualPositionAdjust -= 3;
+    state.visibleStart = Math.min(state.script.length, state.visibleStart + 3);
+    updatePromptDisplay();
+    statusBadge.textContent = '↓ 下滚';
+    setTimeout(() => updateFollowStatus(), 1000);
+  });
+
   $('#btnSlower').addEventListener('click', () => {
     state.manualSpeedAdjust -= 0.2;
     state.scrollSpeed = Math.max(0.5, state.baseScrollSpeed + state.manualSpeedAdjust);
@@ -1347,6 +1368,18 @@ document.addEventListener('keydown', (e) => {
       }
       if (state.paused) statusBadge.textContent = '已暂停';
       else updateFollowStatus();
+      break;
+    case 'ArrowUp':
+      state.visibleStart = Math.max(0, state.visibleStart - 2);
+      updatePromptDisplay();
+      statusBadge.textContent = '↑ 上滚';
+      setTimeout(() => updateFollowStatus(), 1000);
+      break;
+    case 'ArrowDown':
+      state.visibleStart = Math.min(state.script.length, state.visibleStart + 2);
+      updatePromptDisplay();
+      statusBadge.textContent = '↓ 下滚';
+      setTimeout(() => updateFollowStatus(), 1000);
       break;
     case 'ArrowLeft':
       state.manualSpeedAdjust -= 0.2;
