@@ -318,14 +318,15 @@ html, body {
 }
 .camera-feed.mirrored { transform: scaleX(-1); }
 
-.teleprompt-overlay {
+  .teleprompt-overlay {
   position: absolute;
-  inset: 18% 8% 18% 8%;
+  inset: 0 8% 0 8%;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   pointer-events: none;
   z-index: 5;
+  overflow: hidden;
 }
 
 .prompt-text {
