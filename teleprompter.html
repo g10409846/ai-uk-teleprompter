@@ -1059,9 +1059,10 @@ function scrollLoop(timestamp) {
   // Cap dt to prevent huge jumps after tab switch
   const cappedDt = Math.min(dt, 0.1);
 
+  updateSpeakingState();
   const shouldScroll = !state.paused && (
-    (state.autoMode && state.isSpeaking) ||  // smart follow: scroll when speaking
-    !state.autoMode                           // manual: scroll always
+    (state.autoMode && state.recognitionActive) ||  // smart follow: scroll when recognition active
+    !state.autoMode                                   // manual: scroll always
   );
 
   if (shouldScroll) {
@@ -1104,6 +1105,13 @@ function startSilenceDetection() {
 function markSpeaking() {
   state.isSpeaking = true;
   state.consecutiveSilence = 0;
+}
+
+function updateSpeakingState() {
+  // If recognition is active and not failed, ensure isSpeaking is true
+  if (state.autoMode && state.recognitionActive && !state.recognitionFailed) {
+    state.isSpeaking = true;
+  }
 }
 
 // ═══════════════════════════════════════════
