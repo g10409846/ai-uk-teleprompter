@@ -1183,14 +1183,24 @@ function updatePromptDisplay() {
   promptText.textContent = visible;
 
   // Position text so that visibleStart aligns with the reference line (42% from top)
+  // The reference line is at 42% of viewport height from top
+  const refLinePercent = 0.42;
   const charsOffset = state.visibleStart - start;
   const lineOffset = Math.floor(charsOffset / charsPerLine);
   const charOffsetInLine = charsOffset % charsPerLine;
+  
+  // Calculate offset to place visibleStart at reference line
+  // When visibleStart=0, first line should be at refLinePercent of viewport
   const targetY = -(lineOffset * pixelsPerLine + charOffsetInLine / charsPerLine * pixelsPerLine);
+  
+  // Adjust for reference line position - offset by refLinePercent of viewport height
+  const viewportHeight = window.innerHeight || 800;
+  const refLineOffset = refLinePercent * viewportHeight;
+  const adjustedY = targetY + refLineOffset;
 
-  // Calculate max scroll based on total content, not just visible portion
-  const maxScroll = -(totalChars / charsPerLine) * pixelsPerLine;
-  const clampedY = Math.min(0, Math.max(targetY, maxScroll));
+  // Calculate max scroll based on total content
+  const maxScroll = -(totalChars / charsPerLine) * pixelsPerLine + refLineOffset;
+  const clampedY = Math.min(maxScroll, Math.max(adjustedY, 0));
   promptText.style.transform = `translateY(${clampedY}px)`;
 }
 
@@ -1246,8 +1256,8 @@ async function startCountdown() {
 
   state.visibleStart = 0;
   state.manualPositionAdjust = 0;
-  // Show first line at reference position by setting initial offset
-  // (allows scrolling up to see beginning of script)
+  // Initial offset to show first line at reference position (42% from top)
+  // This is handled in updatePromptDisplay via refLineOffset
   state.scrollSpeed = state.baseScrollSpeed;
   state.manualSpeedAdjust = 0;
   state.isSpeaking = false;
