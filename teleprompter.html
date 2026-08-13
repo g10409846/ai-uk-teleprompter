@@ -547,7 +547,7 @@ html, body {
       <div class="record-controls">
         <button class="btn-sm btn-ghost" id="btnUp">↑ 上滚</button>
         <button class="btn-sm btn-ghost" id="btnDown">↓ 下滚</button>
-        <button class="btn-sm btn-ghost" id="btnAutoMode">智能跟随</button>
+        <button class="btn-sm" id="btnAutoMode" style="background:var(--accent);color:#0A0A0C;font-weight:700;border-radius:18px;padding:10px 18px;font-size:13px;">智能跟随</button>
         <button class="btn-sm btn-ghost" id="btnSlower">− 放慢</button>
         <button class="btn-sm btn-ghost" id="btnFaster">+ 加快</button>
         <button class="btn-sm btn-ghost" id="btnPause">暂停</button>
@@ -1175,7 +1175,7 @@ function updatePromptDisplay() {
   const pixelsPerLine = (state.fontSize || 48) * 1.65;
   const viewportHeight = window.innerHeight || 800;
   
-  // Reference line is at 42% from top
+  // Reference line is at 42% from top of viewport
   const refLineY = viewportHeight * 0.42;
 
   // Show enough text above and below the current position
@@ -1186,23 +1186,25 @@ function updatePromptDisplay() {
   const visible = text.substring(start, end);
   promptText.textContent = visible;
 
-  // Position visibleStart at the reference line
+  // Position text so that visibleStart aligns with the reference line
+  // When visibleStart=0, first line should be AT refLineY (42% from top)
+  // translate = refLineY - charOffsetY (moves text block down by refLineY)
   const charsOffset = state.visibleStart - start;
   const lineOffset = Math.floor(charsOffset / charsPerLine);
   const charOffsetInLine = charsOffset % charsPerLine;
-  
-  // When visibleStart=0, first line should be AT the reference line (not at top)
-  // So translate = -(refLineY - charOffset)
-  // This means: text block starts at -refLineY, and moves up as we scroll
   const charOffsetY = lineOffset * pixelsPerLine + charOffsetInLine / charsPerLine * pixelsPerLine;
-  const targetY = charOffsetY - refLineY;
+  
+  // CORRECT formula: translateY = refLineY - charOffsetY
+  // When charOffsetY=0 (start of text), translateY = refLineY (text appears at reference line)
+  // When charOffsetY increases, translateY decreases (text moves up)
+  const targetY = refLineY - charOffsetY;
 
   // Calculate bounds
-  // Max scroll (end of text): text block ends at refLineY
   const totalY = (totalChars / charsPerLine) * pixelsPerLine;
-  const maxY = totalY - refLineY; // maximum positive translation
+  const minY = refLineY - totalY; // minimum translation (end of text at refLineY)
+  const maxY = refLineY; // maximum translation (start of text at refLineY)
   
-  const clampedY = Math.max(0, Math.min(targetY, maxY));
+  const clampedY = Math.max(minY, Math.min(targetY, maxY));
   promptText.style.transform = `translateY(${clampedY}px)`;
 }
 
@@ -1268,6 +1270,9 @@ async function startCountdown() {
   state.lastRafTime = 0;
   recDot.classList.add('active');
   $('#btnAutoMode').textContent = '智能跟随';
+  $('#btnAutoMode').style.background = 'var(--accent)';
+  $('#btnAutoMode').style.color = '#0A0A0C';
+  $('#btnAutoMode').style.fontWeight = '700';
   updateFollowStatus();
 
   // Build prompt display
@@ -1431,11 +1436,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('#btnAutoMode').addEventListener('click', () => {
     state.autoMode = !state.autoMode;
+    const btn = $('#btnAutoMode');
     if (state.autoMode) {
-      $('#btnAutoMode').textContent = '智能跟随';
+      btn.textContent = '智能跟随';
+      btn.style.background = 'var(--accent)';
+      btn.style.color = '#0A0A0C';
+      btn.style.fontWeight = '700';
       updateFollowStatus();
     } else {
-      $('#btnAutoMode').textContent = '手动';
+      btn.textContent = '手动';
+      btn.style.background = 'var(--surface-hover)';
+      btn.style.color = 'var(--text)';
+      btn.style.fontWeight = '400';
+      btn.style.border = '1px solid rgba(255,255,255,0.2)';
       statusBadge.textContent = '手动模式';
     }
   });
