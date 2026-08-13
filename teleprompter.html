@@ -1175,7 +1175,7 @@ function updatePromptDisplay() {
   const pixelsPerLine = (state.fontSize || 48) * 1.65;
   const viewportHeight = window.innerHeight || 800;
   
-  // Reference line is at 42% from top of viewport
+  // Reference line position (42% from top)
   const refLineY = viewportHeight * 0.42;
 
   // Show enough text above and below the current position
@@ -1186,23 +1186,22 @@ function updatePromptDisplay() {
   const visible = text.substring(start, end);
   promptText.textContent = visible;
 
-  // Position text so that visibleStart aligns with the reference line
-  // When visibleStart=0, first line should be AT refLineY (42% from top)
-  // translate = refLineY - charOffsetY (moves text block down by refLineY)
+  // Position text: charOffsetY is position of visibleStart within text block
   const charsOffset = state.visibleStart - start;
   const lineOffset = Math.floor(charsOffset / charsPerLine);
   const charOffsetInLine = charsOffset % charsPerLine;
   const charOffsetY = lineOffset * pixelsPerLine + charOffsetInLine / charsPerLine * pixelsPerLine;
   
-  // CORRECT formula: translateY = refLineY - charOffsetY
-  // When charOffsetY=0 (start of text), translateY = refLineY (text appears at reference line)
-  // When charOffsetY increases, translateY decreases (text moves up)
-  const targetY = refLineY - charOffsetY;
+  // To place visibleStart at refLineY, we need:
+  // translateY = refLineY - charOffsetY - showAbove * pixelsPerLine
+  // This positions the text block so that visibleStart aligns with refLineY
+  const targetY = refLineY - charOffsetY - showAbove * pixelsPerLine;
 
   // Calculate bounds
   const totalY = (totalChars / charsPerLine) * pixelsPerLine;
-  const minY = refLineY - totalY; // minimum translation (end of text at refLineY)
-  const maxY = refLineY; // maximum translation (start of text at refLineY)
+  // When at start (visibleStart=0): text begins showAbove lines above refLineY
+  const minY = refLineY - totalY + showBelow * pixelsPerLine;
+  const maxY = refLineY - showAbove * pixelsPerLine;
   
   const clampedY = Math.max(minY, Math.min(targetY, maxY));
   promptText.style.transform = `translateY(${clampedY}px)`;
