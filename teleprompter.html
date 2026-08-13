@@ -1173,6 +1173,10 @@ function updatePromptDisplay() {
 
   const charsPerLine = Math.floor(2000 / (state.fontSize || 48));
   const pixelsPerLine = (state.fontSize || 48) * 1.65;
+  const viewportHeight = window.innerHeight || 800;
+  
+  // Reference line is at 42% from top
+  const refLineY = viewportHeight * 0.42;
 
   // Show enough text above and below the current position
   const showAbove = 10;
@@ -1182,25 +1186,23 @@ function updatePromptDisplay() {
   const visible = text.substring(start, end);
   promptText.textContent = visible;
 
-  // Position text so that visibleStart aligns with the reference line (42% from top)
-  // The reference line is at 42% of viewport height from top
-  const refLinePercent = 0.42;
+  // Position visibleStart at the reference line
   const charsOffset = state.visibleStart - start;
   const lineOffset = Math.floor(charsOffset / charsPerLine);
   const charOffsetInLine = charsOffset % charsPerLine;
   
-  // Calculate offset to place visibleStart at reference line
-  // When visibleStart=0, first line should be at refLinePercent of viewport
-  const targetY = -(lineOffset * pixelsPerLine + charOffsetInLine / charsPerLine * pixelsPerLine);
-  
-  // Adjust for reference line position - offset by refLinePercent of viewport height
-  const viewportHeight = window.innerHeight || 800;
-  const refLineOffset = refLinePercent * viewportHeight;
-  const adjustedY = targetY + refLineOffset;
+  // When visibleStart=0, first line should be AT the reference line (not at top)
+  // So translate = -(refLineY - charOffset)
+  // This means: text block starts at -refLineY, and moves up as we scroll
+  const charOffsetY = lineOffset * pixelsPerLine + charOffsetInLine / charsPerLine * pixelsPerLine;
+  const targetY = charOffsetY - refLineY;
 
-  // Calculate max scroll based on total content
-  const maxScroll = -(totalChars / charsPerLine) * pixelsPerLine + refLineOffset;
-  const clampedY = Math.min(maxScroll, Math.max(adjustedY, 0));
+  // Calculate bounds
+  // Max scroll (end of text): text block ends at refLineY
+  const totalY = (totalChars / charsPerLine) * pixelsPerLine;
+  const maxY = totalY - refLineY; // maximum positive translation
+  
+  const clampedY = Math.max(0, Math.min(targetY, maxY));
   promptText.style.transform = `translateY(${clampedY}px)`;
 }
 
@@ -1256,8 +1258,7 @@ async function startCountdown() {
 
   state.visibleStart = 0;
   state.manualPositionAdjust = 0;
-  // Initial offset to show first line at reference position (42% from top)
-  // This is handled in updatePromptDisplay via refLineOffset
+  // When visibleStart=0, updatePromptDisplay ensures first line is at reference line
   state.scrollSpeed = state.baseScrollSpeed;
   state.manualSpeedAdjust = 0;
   state.isSpeaking = false;
