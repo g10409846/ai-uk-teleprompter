@@ -1,0 +1,4 @@
+.gstack/
+phase0-validation/.build/
+*.bak
+.DS_Store

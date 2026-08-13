@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AI-UK 提词器</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0A0A0C;
+  --surface: #141419;
+  --text: #D8DCE0;
+  --text-dim: #6B6F76;
+  --accent: #E6A817;
+  --accent-glow: rgba(230,168,23,0.25);
+  --danger: #E04848;
+  --radius: 12px;
+  --font-display: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", "Menlo", monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Layout ── */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  height: 100dvh;
+  position: relative;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.logo {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.rec-dot {
+  display: none;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 8px var(--danger);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.rec-dot.active { display: block; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Phase views ── */
+.phase { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.phase.active { display: flex; }
+
+/* ── Phase: edit ── */
+.edit-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+}
+
+.edit-area textarea {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1.7;
+  padding: 16px;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.edit-area textarea:focus {
+  border-color: var(--accent);
+}
+
+.edit-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.edit-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.edit-controls label {
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.edit-controls input[type="range"] {
+  width: 80px;
+  accent-color: var(--accent);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 28px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: var(--accent);
+  color: #0A0A0C;
+  width: 100%;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.btn-ghost:hover { border-color: rgba(255,255,255,0.25); }
+
+.btn-sm {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  flex-shrink: 0;
+}
+
+/* ── Phase: ready (countdown) ── */
+.countdown-overlay {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.countdown-num {
+  font-size: 120px;
+  font-weight: 200;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.countdown-hint {
+  font-size: 15px;
+  color: var(--text-dim);
+  margin-top: 16px;
+}
+
+/* ── Phase: recording ── */
+.record-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.camera-feed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.camera-feed.mirrored { transform: scaleX(-1); }
+
+.teleprompt-overlay {
+  position: absolute;
+  inset: 16% 5% 16% 5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.prompt-text {
+  font-family: var(--font-display);
+  font-size: var(--prompt-size, 48px);
+  font-weight: 500;
+  line-height: 1.6;
+  text-align: center;
+  color: rgba(255,255,255, var(--prompt-opacity, 0.92));
+  text-shadow: 0 0 12px rgba(0,0,0,0.7), 0 2px 4px rgba(0,0,0,0.5);
+  transition: transform 0.05s linear;
+  will-change: transform;
+  white-space: pre-wrap;
+  width: 100%;
+}
+
+.sight-line {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 42%;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+  opacity: 0.6;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.record-controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+  background: rgba(10,10,12,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  padding: 6px;
+}
+
+.record-controls .btn-sm {
+  border-radius: 16px;
+  font-size: 13px;
+  padding: 10px 16px;
+}
+
+.status-badge {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(10,10,12,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--text-dim);
+}
+
+/* ── Phase: completed ── */
+.complete-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+}
+
+.complete-area video {
+  max-width: 100%;
+  max-height: 50vh;
+  border-radius: var(--radius);
+  background: #000;
+}
+
+.complete-check {
+  font-size: 48px;
+  color: var(--accent);
+}
+
+/* ── Settings panel ── */
+.overlay-settings {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.overlay-settings label { display: flex; align-items: center; gap: 4px; }
+.overlay-settings input[type="range"] { width: 60px; accent-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .prompt-text { font-size: calc(var(--prompt-size, 48px) * 0.7); }
+  .record-controls { gap: 4px; padding: 4px; }
+  .record-controls .btn-sm { padding: 8px 12px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- Header -->
+  <div class="header">
+    <span class="logo">AI-UK 提词器</span>
+    <div>
+      <span class="rec-dot" id="recDot"></span>
+    </div>
+  </div>
+
+  <!-- Phase: Edit -->
+  <div class="phase active" id="phaseEdit">
+    <div class="edit-area">
+      <textarea id="scriptInput" placeholder="粘贴或输入你的口播文案…" autofocus></textarea>
+      <div class="edit-meta">
+        <span id="charCount">0 字</span>
+        <span id="estDuration">预计 0 秒</span>
+      </div>
+      <div class="edit-controls">
+        <label>字号 <input type="range" id="fontSizeSlider" min="24" max="96" value="48" step="2"></label>
+        <label>透明度 <input type="range" id="opacitySlider" min="30" max="100" value="92" step="1"></label>
+        <label>速度 <input type="range" id="baseSpeedSlider" min="20" max="120" value="60" step="5"></label>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnStart">开始录制</button>
+    </div>
+  </div>
+
+  <!-- Phase: Ready (countdown) -->
+  <div class="phase" id="phaseReady">
+    <div class="countdown-overlay">
+      <div class="countdown-num" id="countdownNum">3</div>
+      <div class="countdown-hint">准备开始…</div>
+    </div>
+  </div>
+
+  <!-- Phase: Recording -->
+  <div class="phase" id="phaseRecord">
+    <div class="record-container" id="recordContainer">
+      <video class="camera-feed mirrored" id="cameraFeed" autoplay playsinline muted></video>
+      <div class="sight-line"></div>
+      <div class="teleprompt-overlay">
+        <div class="prompt-text" id="promptText"></div>
+      </div>
+      <div class="status-badge" id="statusBadge">等待声音…</div>
+      <div class="record-controls">
+        <button class="btn-sm btn-ghost" id="btnAutoMode">跟随中</button>
+        <button class="btn-sm btn-ghost" id="btnSlower">− 放慢</button>
+        <button class="btn-sm btn-ghost" id="btnFaster">+ 加快</button>
+        <button class="btn-sm btn-ghost" id="btnPause">暂停</button>
+        <button class="btn-sm" id="btnStop" style="background:var(--danger);color:#fff;">停止</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase: Completed -->
+  <div class="phase" id="phaseDone">
+    <div class="complete-area">
+      <div class="complete-check">✓</div>
+      <p>录制完成</p>
+      <video id="reviewVideo" controls></video>
+      <p style="font-size:13px;color:var(--text-dim);" id="saveHint"></p>
+      <div class="btn-row" style="width:100%;max-width:320px;">
+        <button class="btn btn-ghost btn-sm" id="btnRedo">重新录制</button>
+        <a class="btn btn-primary btn-sm" id="btnDownload" download="teleprompt-recording.webm">保存视频</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// AI-UK 智能提词器 · 浏览器版
+// ═══════════════════════════════════════════
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+// ── State ──
+const state = {
+  phase: 'edit',             // edit | ready | record | done
+  script: '',
+  cursorIdx: 0,             // character index in script
+  scrollSpeed: 60,          // px/s
+  baseSpeed: 60,
+  autoMode: true,
+  paused: false,
+  fontSize: 48,
+  opacity: 0.92,
+  isSpeaking: false,
+  lastSpeechTime: 0,
+  recognitionActive: false,
+  recordingBlob: null,
+  mediaRecorder: null,
+  recordedChunks: [],
+  stream: null,
+};
+
+// ── DOM refs ──
+const phaseEdit = $('#phaseEdit');
+const phaseReady = $('#phaseReady');
+const phaseRecord = $('#phaseRecord');
+const phaseDone = $('#phaseDone');
+const scriptInput = $('#scriptInput');
+const charCount = $('#charCount');
+const estDuration = $('#estDuration');
+const promptText = $('#promptText');
+const cameraFeed = $('#cameraFeed');
+const statusBadge = $('#statusBadge');
+const recDot = $('#recDot');
+const reviewVideo = $('#reviewVideo');
+const saveHint = $('#saveHint');
+const btnDownload = $('#btnDownload');
+const countdownNum = $('#countdownNum');
+
+// ── Phase switching ──
+function setPhase(phase) {
+  state.phase = phase;
+  $$('.phase').forEach(el => el.classList.remove('active'));
+  const target = {
+    edit: phaseEdit, ready: phaseReady, record: phaseRecord, done: phaseDone
+  }[phase];
+  if (target) target.classList.add('active');
+}
+
+// ── Edit: meta updates ──
+scriptInput.addEventListener('input', () => {
+  const text = scriptInput.value;
+  charCount.textContent = `${text.length} 字`;
+  const estimatedSec = text.length / 4.5;
+  estDuration.textContent = `预计 ${Math.round(estimatedSec)} 秒`;
+});
+
+// ── Font size ──
+$('#fontSizeSlider').addEventListener('input', (e) => {
+  state.fontSize = parseInt(e.target.value);
+  promptText.style.setProperty('--prompt-size', `${state.fontSize}px`);
+  localStorage.setItem('tp-fontSize', state.fontSize);
+});
+
+// ── Opacity ──
+$('#opacitySlider').addEventListener('input', (e) => {
+  state.opacity = parseInt(e.target.value) / 100;
+  promptText.style.setProperty('--prompt-opacity', state.opacity);
+  localStorage.setItem('tp-opacity', Math.round(state.opacity * 100));
+});
+
+// ── Base speed ──
+$('#baseSpeedSlider').addEventListener('input', (e) => {
+  state.baseSpeed = parseInt(e.target.value);
+  state.scrollSpeed = state.baseSpeed;
+  localStorage.setItem('tp-baseSpeed', state.baseSpeed);
+});
+
+// ── Restore settings ──
+(function restoreSettings() {
+  const fs = localStorage.getItem('tp-fontSize');
+  if (fs) { state.fontSize = parseInt(fs); $('#fontSizeSlider').value = fs; }
+  const op = localStorage.getItem('tp-opacity');
+  if (op) { state.opacity = parseInt(op) / 100; $('#opacitySlider').value = op; }
+  const bs = localStorage.getItem('tp-baseSpeed');
+  if (bs) { state.baseSpeed = parseInt(bs); state.scrollSpeed = state.baseSpeed; $('#baseSpeedSlider').value = bs; }
+  promptText.style.setProperty('--prompt-size', `${state.fontSize}px`);
+  promptText.style.setProperty('--prompt-opacity', state.opacity);
+})();
+
+// ═══════════════════════════════════════════
+// Speech Recognition
+// ═══════════════════════════════════════════
+let recognition = null;
+
+function initSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    console.warn('SpeechRecognition not available');
+    return null;
+  }
+  const rec = new SpeechRecognition();
+  rec.lang = 'zh-CN';
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+  return rec;
+}
+
+function startRecognition() {
+  recognition = initSpeechRecognition();
+  if (!recognition) {
+    statusBadge.textContent = '语音识别不可用 · 手动模式';
+    return;
+  }
+
+  let lastResultTime = Date.now();
+  let charsSinceLast = 0;
+
+  recognition.onresult = (event) => {
+    const now = Date.now();
+    state.lastSpeechTime = now;
+
+    let finalTranscript = '';
+    let interimTranscript = '';
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      if (result.isFinal) {
+        finalTranscript += result[0].transcript;
+      } else {
+        interimTranscript += result[0].transcript;
+      }
+    }
+
+    const transcript = finalTranscript || interimTranscript;
+    if (!transcript) return;
+
+    state.isSpeaking = true;
+    statusBadge.textContent = state.autoMode ? '跟随中' : '手动模式';
+
+    if (state.autoMode && !state.paused) {
+      // Estimate speed from recognition rate
+      const elapsed = (now - lastResultTime) / 1000;
+      if (elapsed > 0.2 && transcript.length > 0) {
+        const charsPerSec = transcript.length / elapsed;
+        // Map 3-10 chars/sec → 0.5x-1.8x base speed
+        const rate = Math.min(Math.max(charsPerSec / 6, 0.5), 1.8);
+        state.scrollSpeed = state.baseSpeed * rate;
+      }
+
+      // Anchor: fuzzy match to advance cursor
+      const matchPos = fuzzyMatchScript(transcript);
+      if (matchPos !== null && matchPos > state.cursorIdx) {
+        state.cursorIdx = matchPos;
+      }
+
+      lastResultTime = now;
+    }
+  };
+
+  recognition.onerror = (event) => {
+    console.warn('Speech error:', event.error);
+    if (event.error === 'no-speech' || event.error === 'aborted') {
+      // Normal, restart
+    } else {
+      statusBadge.textContent = `识别错误: ${event.error}`;
+    }
+  };
+
+  recognition.onend = () => {
+    state.recognitionActive = false;
+    // Auto-restart if still recording
+    if (state.phase === 'record' && state.autoMode) {
+      try { recognition.start(); state.recognitionActive = true; } catch(e) {}
+    }
+  };
+
+  try {
+    recognition.start();
+    state.recognitionActive = true;
+  } catch(e) {
+    console.warn('Speech start failed:', e);
+    statusBadge.textContent = '语音未启动 · 手动模式';
+  }
+}
+
+function fuzzyMatchScript(transcript) {
+  if (!state.script) return null;
+  const scriptLower = state.script.replace(/\s+/g, '');
+  const tLower = transcript.replace(/\s+/g, '');
+
+  // Search near current cursor
+  const window = 40; // chars
+  const start = Math.max(0, state.cursorIdx - window);
+  const end = Math.min(scriptLower.length, state.cursorIdx + window + tLower.length + 10);
+  const region = scriptLower.substring(start, end);
+
+  // Simple substring match
+  // Try longest common prefix
+  let bestPos = null;
+  let bestLen = 0;
+
+  // Try the last N chars of transcript as a probe
+  const probes = [];
+  const tLen = tLower.length;
+  for (let probeLen = Math.min(tLen, 8); probeLen >= 2; probeLen--) {
+    probes.push(tLower.substring(tLen - probeLen));
+  }
+
+  for (const probe of probes) {
+    const idx = region.indexOf(probe);
+    if (idx >= 0) {
+      const absPos = start + idx + probe.length;
+      if (probe.length > bestLen) {
+        bestLen = probe.length;
+        bestPos = absPos;
+      }
+    }
+  }
+
+  return bestPos;
+}
+
+// ═══════════════════════════════════════════
+// VAD: silence detection timer
+// ═══════════════════════════════════════════
+let silenceTimer = null;
+const SILENCE_THRESHOLD = 800; // ms of no recognition → pause scroll
+
+function resetSilenceTimer() {
+  if (silenceTimer) clearTimeout(silenceTimer);
+  silenceTimer = setTimeout(() => {
+    state.isSpeaking = false;
+    if (state.autoMode) {
+      statusBadge.textContent = '已停顿';
+    }
+  }, SILENCE_THRESHOLD);
+}
+
+// ═══════════════════════════════════════════
+// Camera + Recording
+// ═══════════════════════════════════════════
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: true
+    });
+    state.stream = stream;
+    cameraFeed.srcObject = stream;
+    return stream;
+  } catch(e) {
+    console.error('Camera error:', e);
+    // Try audio-only if camera fails
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.stream = stream;
+      statusBadge.textContent = '无摄像头 · 音频录制';
+      return stream;
+    } catch(e2) {
+      throw new Error('无法访问摄像头和麦克风');
+    }
+  }
+}
+
+function startMediaRecorder(stream) {
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ? 'video/webm;codecs=vp9'
+    : MediaRecorder.isTypeSupported('video/webm')
+      ? 'video/webm'
+      : 'video/mp4';
+
+  state.recordedChunks = [];
+  try {
+    state.mediaRecorder = new MediaRecorder(stream, { mimeType });
+  } catch(e) {
+    state.mediaRecorder = new MediaRecorder(stream);
+  }
+
+  state.mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) state.recordedChunks.push(e.data);
+  };
+
+  state.mediaRecorder.onstop = () => {
+    state.recordingBlob = new Blob(state.recordedChunks, { type: state.mediaRecorder.mimeType });
+    const url = URL.createObjectURL(state.recordingBlob);
+    reviewVideo.src = url;
+    btnDownload.href = url;
+
+    const ext = state.mediaRecorder.mimeType.includes('mp4') ? 'mp4' : 'webm';
+    btnDownload.download = `提词录制_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.${ext}`;
+    saveHint.textContent = `文件已生成 (${(state.recordingBlob.size / 1024 / 1024).toFixed(1)} MB) · 点击保存按钮下载`;
+  };
+
+  state.mediaRecorder.start(1000); // 1s chunks
+}
+
+// ═══════════════════════════════════════════
+// Scroll loop
+// ═══════════════════════════════════════════
+let scrollRAF = null;
+
+function scrollLoop() {
+  if (state.phase !== 'record') { scrollRAF = null; return; }
+
+  if (!state.paused && state.isSpeaking && state.autoMode) {
+    const speed = state.scrollSpeed;
+    state.cursorIdx += speed / 60; // advance per frame (~60fps)
+    updatePromptDisplay();
+  }
+
+  // Manual mode: always scroll
+  if (!state.paused && !state.autoMode) {
+    state.cursorIdx += state.scrollSpeed / 60;
+    updatePromptDisplay();
+  }
+
+  scrollRAF = requestAnimationFrame(scrollLoop);
+}
+
+function updatePromptDisplay() {
+  const text = state.script || '';
+  const totalChars = text.length;
+  if (totalChars === 0) { promptText.textContent = ''; return; }
+
+  // Show a window of text centered on cursor
+  const windowChars = Math.floor(100 / (state.fontSize / 48)); // fewer chars when font bigger
+  const start = Math.max(0, Math.floor(state.cursorIdx - windowChars * 0.3));
+  const end = Math.min(totalChars, start + windowChars);
+  const visible = text.substring(start, end);
+
+  // Highlight current position with subtle markers
+  // For simplicity, show the visible slice; cursor is roughly at 30% of window
+  promptText.textContent = visible;
+
+  // Transform: shift text up so cursor-aligned line is at sight-line (42% from top)
+  // We use translateY to create the scroll effect
+  const cursorInWindow = state.cursorIdx - start;
+  const ratioInWindow = windowChars > 0 ? cursorInWindow / windowChars : 0;
+  const offsetPercent = (ratioInWindow - 0.35) * 100;
+  promptText.style.transform = `translateY(-${offsetPercent}%)`;
+}
+
+// ═══════════════════════════════════════════
+// Countdown → Start recording
+// ═══════════════════════════════════════════
+async function startCountdown() {
+  state.script = scriptInput.value.trim();
+  if (!state.script) {
+    scriptInput.focus();
+    scriptInput.style.borderColor = 'var(--danger)';
+    setTimeout(() => { scriptInput.style.borderColor = ''; }, 1500);
+    return;
+  }
+
+  setPhase('ready');
+
+  // Start camera during countdown
+  try {
+    await startCamera();
+  } catch(e) {
+    alert('请允许使用相机和麦克风，否则无法录制。\n请在浏览器设置中允许本页面的相机和麦克风权限。');
+    setPhase('edit');
+    return;
+  }
+
+  // 3-2-1 countdown
+  for (let i = 3; i >= 1; i--) {
+    countdownNum.textContent = i;
+    await sleep(1000);
+  }
+
+  // Start!
+  setPhase('record');
+  promptText.textContent = state.script;
+  state.cursorIdx = 0;
+  state.scrollSpeed = state.baseSpeed;
+  state.isSpeaking = false;
+  state.paused = false;
+  state.autoMode = true;
+  recDot.classList.add('active');
+  $('#btnAutoMode').textContent = '跟随中';
+
+  // Build prompt display
+  updatePromptDisplay();
+
+  // Start recording
+  startMediaRecorder(state.stream);
+
+  // Start speech recognition
+  startRecognition();
+
+  // Start scroll loop
+  scrollRAF = requestAnimationFrame(scrollLoop);
+
+  // VAD loop: check isSpeaking flag periodically
+  const vadLoop = () => {
+    if (state.phase !== 'record') return;
+    resetSilenceTimer();
+    setTimeout(vadLoop, 500);
+  };
+  vadLoop();
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════
+// Stop recording
+// ═══════════════════════════════════════════
+function stopRecording() {
+  // Stop media recorder
+  if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+    state.mediaRecorder.stop();
+  }
+
+  // Stop speech recognition
+  if (recognition) {
+    try { recognition.stop(); } catch(e) {}
+    state.recognitionActive = false;
+  }
+
+  // Stop camera
+  if (state.stream) {
+    state.stream.getTracks().forEach(t => t.stop());
+    state.stream = null;
+  }
+
+  // Stop scroll
+  if (scrollRAF) {
+    cancelAnimationFrame(scrollRAF);
+    scrollRAF = null;
+  }
+
+  recDot.classList.remove('active');
+  setPhase('done');
+
+  // Wait a tick for MediaRecorder.onstop to fire
+  setTimeout(() => {
+    if (!state.recordingBlob) {
+      saveHint.textContent = '录制文件处理中…如长时间无反应，请检查浏览器是否支持录制';
+    }
+  }, 500);
+}
+
+// ═══════════════════════════════════════════
+// Button handlers
+// ═══════════════════════════════════════════
+$('#btnStart').addEventListener('click', startCountdown);
+
+$('#btnStop').addEventListener('click', stopRecording);
+
+$('#btnPause').addEventListener('click', () => {
+  state.paused = !state.paused;
+  $('#btnPause').textContent = state.paused ? '继续' : '暂停';
+  if (state.mediaRecorder) {
+    if (state.paused) state.mediaRecorder.pause();
+    else state.mediaRecorder.resume();
+  }
+  statusBadge.textContent = state.paused ? '已暂停' : (state.autoMode ? '跟随中' : '手动模式');
+});
+
+$('#btnAutoMode').addEventListener('click', () => {
+  state.autoMode = !state.autoMode;
+  $('#btnAutoMode').textContent = state.autoMode ? '跟随中' : '手动';
+  statusBadge.textContent = state.autoMode ? '跟随中' : '手动模式';
+});
+
+$('#btnSlower').addEventListener('click', () => {
+  state.scrollSpeed = Math.max(10, state.scrollSpeed - 15);
+  statusBadge.textContent = `速度: ${Math.round(state.scrollSpeed)}`;
+});
+
+$('#btnFaster').addEventListener('click', () => {
+  state.scrollSpeed = Math.min(200, state.scrollSpeed + 15);
+  statusBadge.textContent = `速度: ${Math.round(state.scrollSpeed)}`;
+});
+
+$('#btnRedo').addEventListener('click', () => {
+  state.recordingBlob = null;
+  state.cursorIdx = 0;
+  state.recordedChunks = [];
+  reviewVideo.src = '';
+  btnDownload.href = '';
+  setPhase('edit');
+});
+
+// ═══════════════════════════════════════════
+// Keyboard shortcuts
+// ═══════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if (state.phase !== 'record') return;
+  switch(e.key) {
+    case ' ':
+      e.preventDefault();
+      state.paused = !state.paused;
+      $('#btnPause').textContent = state.paused ? '继续' : '暂停';
+      break;
+    case 'ArrowLeft':
+      state.scrollSpeed = Math.max(10, state.scrollSpeed - 10);
+      break;
+    case 'ArrowRight':
+      state.scrollSpeed = Math.min(200, state.scrollSpeed + 10);
+      break;
+    case 'Escape':
+      stopRecording();
+      break;
+    case 'm':
+      state.autoMode = !state.autoMode;
+      $('#btnAutoMode').textContent = state.autoMode ? '跟随中' : '手动';
+      break;
+  }
+});
+
+// ═══════════════════════════════════════════
+// Handle page unload
+// ═══════════════════════════════════════════
+window.addEventListener('beforeunload', () => {
+  if (state.stream) {
+    state.stream.getTracks().forEach(t => t.stop());
+  }
+  if (recognition) {
+    try { recognition.stop(); } catch(e) {}
+  }
+});
+
+console.log('AI-UK 提词器已就绪');
+console.log('快捷键: 空格=暂停/继续, ←→=调速, M=切换手动/跟随, Esc=停止');
+</script>
+</body>
+</html>
