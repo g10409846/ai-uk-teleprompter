@@ -1259,7 +1259,9 @@ async function startCountdown() {
 
   state.visibleStart = 0;
   state.manualPositionAdjust = 0;
-  // When visibleStart=0, updatePromptDisplay ensures first line is at reference line
+  // Offset visibleStart so first line appears at reference line (42% from top)
+  // With showAbove=10 lines of buffer, we start at char position 0
+  // and the first line will be displayed at the reference line
   state.scrollSpeed = state.baseScrollSpeed;
   state.manualSpeedAdjust = 0;
   state.isSpeaking = false;
